@@ -1367,7 +1367,7 @@ document.addEventListener('click', function(e) {
 const ELEMENTOS = {
   '1': { nombre: 'ACTIVO', tieneCorrencia: true },
   '2': { nombre: 'PASIVO', tieneCorrencia: true },
-  '3': { nombre: 'PATRIMONIO NETO', tieneCorrencia: false },
+  '3': { nombre: 'PATRIMONIO NETO', tieneCorrencia: true, subLabels: ['Aporte de los propietarios', 'Resultados acumulados'] },
   '4': { nombre: 'RESULTADOS POSITIVOS', tieneCorrencia: false },
   '5': { nombre: 'RESULTADOS NEGATIVOS', tieneCorrencia: false }
 };
@@ -1381,7 +1381,7 @@ const RUBROS = {
     'Corriente': ['Proveedores de bienes y servicios', 'Préstamos y otros pasivos financieros', 'Deudas fiscales', 'Deudas laborales y previsionales', 'Deudas en especie', 'Deudas con partes relacionadas', 'Otras deudas', 'Subsidios y otras ayudas gubernamentales', 'Previsiones'],
     'No corriente': ['Proveedores de bienes y servicios', 'Préstamos y otros pasivos financieros', 'Deudas fiscales', 'Deudas laborales y previsionales', 'Deudas en especie', 'Deudas con partes relacionadas', 'Otras deudas', 'Subsidios y otras ayudas gubernamentales', 'Pasivo neto por impuesto diferido', 'Previsiones']
   },
-  '3': { '_': ['Capital social', 'Ajuste de capital', 'Aportes irrevocables', 'Prima de emisión', 'Ganancias reservadas', 'Resultados no asignados'] },
+  '3': { 'Aporte de los propietarios': ['Capital', 'Ajuste de Capital', 'Aportes Irrevocables de Capital', 'Primas de Emisión'], 'Resultados acumulados': ['Ganancias reservadas', 'Resultados diferidos', 'Resultados no asignados'] },
   '4': { '_': ['Ingresos por ventas de bienes y prestación de servicios', 'Otros ingresos'] },
   '5': { '_': ['Costo de los bienes vendidos y servicios prestados', 'Gastos de comercialización', 'Gastos de administración', 'Otros gastos operativos', 'Cambios en el valor razonable de propiedades de inversión', 'Pérdidas por desvalorización', 'Otros resultados financieros y por tenencia', 'Otros egresos'] }
 };
@@ -1489,7 +1489,7 @@ function onElementoChange() {
   if (elem.tieneCorrencia) {
     step2.classList.remove('disabled');
     const sel = document.getElementById('selCorrencia');
-    sel.innerHTML = '<option value="">— Seleccionar —</option><option value="Corriente">Corriente</option><option value="No corriente">No corriente</option>';
+    if (elem.subLabels) { sel.innerHTML = '<option value="">— Seleccionar —</option>'; elem.subLabels.forEach(label => { sel.innerHTML += '<option value="'+label+'">'+label+'</option>'; }); } else { sel.innerHTML = '<option value="">— Seleccionar —</option><option value="Corriente">Corriente</option><option value="No corriente">No corriente</option>'; }
   } else {
     step2.classList.add('disabled');
     document.getElementById('selCorrencia').value = '_skip_';
@@ -1605,7 +1605,7 @@ function getCodigo() {
   if (elem.tieneCorrencia) {
     const corrVal = document.getElementById('selCorrencia').value;
     if (!corrVal) return code;
-    code += '.' + (corrVal === 'Corriente' ? '1' : '2');
+    if (elem.subLabels) { code += '.' + (elem.subLabels.indexOf(corrVal) + 1); } else { code += '.' + (corrVal === 'Corriente' ? '1' : '2'); }
   } else {
     code += '.0';
   }
@@ -1712,7 +1712,7 @@ function recalcCodes() {
   Object.values(groups).forEach(group => {
     group.forEach((c, i) => {
       const elem = c.elemento;
-      const corrPart = ELEMENTOS[elem].tieneCorrencia ? (c.correncia === 'Corriente' ? '1' : '2') : '0';
+      const elemDef = ELEMENTOS[elem]; let corrPart = '0'; if (elemDef.tieneCorrencia) { if (elemDef.subLabels) { corrPart = String(elemDef.subLabels.indexOf(c.correncia) + 1); } else { corrPart = c.correncia === 'Corriente' ? '1' : '2'; } }
       const elemRubros = ELEMENTOS[elem].tieneCorrencia ? RUBROS[elem][c.correncia] : RUBROS[elem]['_'];
       const rubroIdx = elemRubros ? elemRubros.indexOf(c.rubro) + 1 : 0;
       c.codigo = elem + '.' + corrPart + '.' + String(rubroIdx).padStart(2, '0') + '.' + String(i + 1).padStart(2, '0');
@@ -1772,7 +1772,7 @@ function renderTree() {
       Object.keys(elem.children).forEach(corrKey => {
         const corr = elem.children[corrKey];
         const corrId = elemId + '_' + corrKey.replace(/\s/g, '');
-        const corrCode = elemKey + '.' + (corrKey === 'Corriente' ? '1' : '2');
+       const elemDef2 = ELEMENTOS[elemKey]; const corrCode = elemKey + '.' + (elemDef2.subLabels ? (elemDef2.subLabels.indexOf(corrKey) + 1) : (corrKey === 'Corriente' ? '1' : '2'));
         const corrCount = Object.values(corr.children).reduce((s, r) => s + r.cuentas.length, 0);
 
         html += `<div class="tree-node">
@@ -1984,7 +1984,7 @@ function renderESP(container, saldosCuentas) {
   html += `<tr class="esp-elem-row"><td colspan="2" style="padding-top:20px;"><strong>P A T R I M O N I O&nbsp;&nbsp;&nbsp;N E T O</strong></td></tr>`;
   
   let totalPN = 0;
-  RUBROS['3']['_'].forEach(rName => {
+  (ELEMENTOS['3'].subLabels || ['_']).forEach(sub => { (RUBROS['3'][sub] || []).forEach(rName => {
     const totalR = sumarSaldosRubro(saldosCuentas, '3', '_', rName);
     if (totalR !== 0) {
       html += `<tr class="esp-rubro-row PN-rubro"><td>${rName} (según Estado correspondiente)</td><td style="text-align:right;">${formatMoney(totalR)}</td></tr>`;
